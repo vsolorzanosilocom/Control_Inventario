@@ -1,0 +1,6 @@
+{
+  "name": "Silocom - Control de Inventarios",
+  "description": "Sistema profesional de resúmenes de control de inventarios para Silocom (SIMs, Routers, Flota/GPS, SensorizeIt/IoT), con sincronización en tiempo real con Google Sheets, tablas dinámicas pivotantes y desglose detallado de registros.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
