@@ -38,18 +38,78 @@ import { parseCsvToRouters } from './utils/routerCsvParser';
 import { parseCsvToFlota } from './utils/flotaCsvParser';
 import { parseCsvToSensorizeit } from './utils/sensorizeitCsvParser';
 import { Radio, Cpu, Truck, Activity, RefreshCw, AlertTriangle, Layers, Database } from 'lucide-react';
-import {
-  DEFAULT_MASTER_CONFIG,
-  STORAGE_KEY_MASTER_CONFIG,
-  getInitialMasterConfig,
-} from './config/sheetsConfig';
+
+const STORAGE_KEY_MASTER_CONFIG = 'silocom_inventory_master_config_v4';
+
+const DEFAULT_MASTER_CONFIG: MultiSheetMasterConfig = {
+  sim: {
+    sheetIdOrUrl: '',
+    sheetName: 'SIM',
+    apiKey: '',
+    publishedCsvUrl: '',
+    lastSyncTime: null,
+    syncStatus: 'idle',
+    errorMessage: null,
+  },
+  router: {
+    sheetIdOrUrl: '',
+    sheetName: 'ROUTER',
+    apiKey: '',
+    publishedCsvUrl: '',
+    lastSyncTime: null,
+    syncStatus: 'idle',
+    errorMessage: null,
+  },
+  flota: {
+    sheetIdOrUrl: '',
+    sheetName: 'INV FLOTA',
+    apiKey: '',
+    publishedCsvUrl: '',
+    lastSyncTime: null,
+    syncStatus: 'idle',
+    errorMessage: null,
+  },
+  sensorizeit: {
+    sheetIdOrUrl: '',
+    sheetName: 'INV SENSORIZEIT',
+    apiKey: '',
+    publishedCsvUrl: '',
+    lastSyncTime: null,
+    syncStatus: 'idle',
+    errorMessage: null,
+  },
+  otros: {
+    sheetIdOrUrl: '',
+    sheetName: 'OTROS',
+    apiKey: '',
+    publishedCsvUrl: '',
+    lastSyncTime: null,
+    syncStatus: 'idle',
+    errorMessage: null,
+  },
+  autoRefreshIntervalSeconds: 0,
+};
 
 export default function App() {
   // Tab state
   const [activeTab, setActiveTab] = useState<InventoryTab>('sim');
 
-  // Master config for 5 sheets (merges environment variables / preconfigured defaults with localStorage)
-  const [masterConfig, setMasterConfig] = useState<MultiSheetMasterConfig>(() => getInitialMasterConfig());
+  // Master config for 5 sheets
+  const [masterConfig, setMasterConfig] = useState<MultiSheetMasterConfig>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_MASTER_CONFIG);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return {
+          ...DEFAULT_MASTER_CONFIG,
+          ...parsed,
+        };
+      } catch (e) {
+        console.error('Error loading config from localStorage', e);
+      }
+    }
+    return DEFAULT_MASTER_CONFIG;
+  });
 
   // Data states
   const [simItems, setSimItems] = useState<SimCardItem[]>(() => parseCsvToSimCards(INITIAL_CSV_RAW));
@@ -251,13 +311,6 @@ export default function App() {
     setMasterConfig(newConfig);
     localStorage.setItem(STORAGE_KEY_MASTER_CONFIG, JSON.stringify(newConfig));
     syncAllConfiguredSlots(newConfig);
-  };
-
-  // Reset to default global configurations (clears local overrides)
-  const handleResetToDefaultConfig = () => {
-    localStorage.removeItem(STORAGE_KEY_MASTER_CONFIG);
-    setMasterConfig({ ...DEFAULT_MASTER_CONFIG });
-    syncAllConfiguredSlots(DEFAULT_MASTER_CONFIG);
   };
 
   // Sync active tab or all configured
@@ -622,7 +675,6 @@ export default function App() {
         onClose={() => setIsSettingsOpen(false)}
         masterConfig={masterConfig}
         onSaveMasterConfig={handleSaveMasterConfig}
-        onResetDefaultConfig={handleResetToDefaultConfig}
         onTestAndSyncActive={(tab, cfg) => syncSlot(tab, cfg)}
         onDirectCsvLoad={handleDirectCsvLoad}
         isSyncing={isSyncing}

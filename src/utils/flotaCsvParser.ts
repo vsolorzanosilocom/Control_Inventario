@@ -1,21 +1,6 @@
 import Papa from 'papaparse';
 import { FlotaItem } from '../types';
-
-export function normalizeText(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  return String(value)
-    .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-export function normalizeDimension(value: unknown, fallback: string): string {
-  const clean = normalizeText(value);
-  if (!clean || clean === '-' || clean === 'N/A' || clean === 'S/N' || clean === 'SIN INFORMACION' || clean === 'NONE') {
-    return fallback;
-  }
-  return clean.toUpperCase();
-}
+import { normalizeText, normalizeDimension, isRowValidData, findColumnIndex } from './csvUtils';
 
 interface FlotaColumnIndices {
   idxSerial: number;
@@ -39,54 +24,28 @@ interface FlotaColumnIndices {
 function findFlotaColumnIndices(headers: string[]): FlotaColumnIndices {
   const normHeaders = headers.map(h => normalizeText(h).toUpperCase());
 
-  const findIdx = (keywords: string[], defaultIdx: number): number => {
-    for (const kw of keywords) {
-      const idx = normHeaders.indexOf(kw);
-      if (idx !== -1) return idx;
-    }
-    for (const kw of keywords) {
-      const idx = normHeaders.findIndex(h => h.includes(kw));
-      if (idx !== -1) return idx;
-    }
-    return defaultIdx;
-  };
-
   return {
-    idxSerial: findIdx(['SERIAL', 'SERIE', 'S/N'], 0),
-    idxImei: findIdx(['IMEI'], 1),
-    idxMarca: findIdx(['MARCA', 'FABRICANTE', 'BRAND'], 2),
-    idxModelo: findIdx(['MODELO', 'MODEL'], 3),
-    idxFechaEntrada: findIdx(['FECHA DE ENTRADA', 'FECHA ENTRADA', 'F. ENTRADA', 'ENTRADA', 'INGRESO'], 4),
-    idxObservacion: findIdx(['OBSERVACION', 'OBSERVACIONES', 'NOTA', 'NOTAS', 'OBS'], 5),
-    idxRifCliente: findIdx(['RIF CLIENTE', 'RIF', 'COD CLIENTE', 'COD_CLIENTE', 'CODIGO CLIENTE'], 6),
-    idxComercio: findIdx(['COMERCIO', 'NOMBRE COMERCIO', 'CLIENTE', 'ESTABLECIMIENTO'], 7),
-    idxSimAsignada: findIdx(['SIM ASIGNADA', 'SIM', 'LINEA', 'NUMERO SIM', 'SIMCARD'], 8),
-    idxOperadora: findIdx(['OPERADORA', 'OPERADOR', 'CARRIER'], 9),
-    idxAlmacen: findIdx(['ALMACEN', 'ALMACÉN', 'UBICACION', 'DEPOSITO', 'CUSTODIA'], 10),
-    idxTecnico: findIdx(['TECNICO', 'TÉCNICO', 'TECNICOS', 'RESPONSABLE'], 11),
-    idxFechaSalida: findIdx(['FECHA DE SALIDA', 'FECHA SALIDA', 'F. SALIDA', 'SALIDA', 'EGRESO'], 12),
-    idxPermanencia: findIdx(['PERMANENCIA', 'TIEMPO'], 13),
-    idxStatus: findIdx(['STATUS', 'ESTATUS', 'ESTADO', 'ESTADO OPERATIVO'], 14),
-    idxFechaInstalacion: findIdx(['FECHA DE INSTALACION', 'FECHA INSTALACION', 'F. INSTALACION', 'INSTALACION'], 15),
+    idxSerial: findColumnIndex(['SERIAL', 'SERIE', 'S/N'], 0, normHeaders),
+    idxImei: findColumnIndex(['IMEI'], 1, normHeaders),
+    idxMarca: findColumnIndex(['MARCA', 'FABRICANTE', 'BRAND'], 2, normHeaders),
+    idxModelo: findColumnIndex(['MODELO', 'MODEL'], 3, normHeaders),
+    idxFechaEntrada: findColumnIndex(['FECHA DE ENTRADA', 'FECHA ENTRADA', 'F. ENTRADA', 'ENTRADA', 'INGRESO'], 4, normHeaders),
+    idxObservacion: findColumnIndex(['OBSERVACION', 'OBSERVACIONES', 'NOTA', 'NOTAS', 'OBS'], 5, normHeaders),
+    idxRifCliente: findColumnIndex(['RIF CLIENTE', 'RIF', 'COD CLIENTE', 'COD_CLIENTE', 'CODIGO CLIENTE'], 6, normHeaders),
+    idxComercio: findColumnIndex(['COMERCIO', 'NOMBRE COMERCIO', 'CLIENTE', 'ESTABLECIMIENTO'], 7, normHeaders),
+    idxSimAsignada: findColumnIndex(['SIM ASIGNADA', 'SIM', 'LINEA', 'NUMERO SIM', 'SIMCARD'], 8, normHeaders),
+    idxOperadora: findColumnIndex(['OPERADORA', 'OPERADOR', 'CARRIER'], 9, normHeaders),
+    idxAlmacen: findColumnIndex(['ALMACEN', 'ALMACÉN', 'UBICACION', 'DEPOSITO', 'CUSTODIA'], 10, normHeaders),
+    idxTecnico: findColumnIndex(['TECNICO', 'TÉCNICO', 'TECNICOS', 'RESPONSABLE'], 11, normHeaders),
+    idxFechaSalida: findColumnIndex(['FECHA DE SALIDA', 'FECHA SALIDA', 'F. SALIDA', 'SALIDA', 'EGRESO'], 12, normHeaders),
+    idxPermanencia: findColumnIndex(['PERMANENCIA', 'TIEMPO'], 13, normHeaders),
+    idxStatus: findColumnIndex(['STATUS', 'ESTATUS', 'ESTADO', 'ESTADO OPERATIVO'], 14, normHeaders),
+    idxFechaInstalacion: findColumnIndex(['FECHA DE INSTALACION', 'FECHA INSTALACION', 'F. INSTALACION', 'INSTALACION'], 15, normHeaders),
   };
 }
 
 function isFlotaRowValid(cells: string[]): boolean {
-  const nonEmptyCells = cells.filter(c => normalizeText(c).length > 0);
-  if (nonEmptyCells.length === 0) return false;
-
-  const firstNonEmpty = normalizeText(nonEmptyCells[0]).toUpperCase();
-  if (
-    firstNonEmpty === 'TOTAL' ||
-    firstNonEmpty === 'TOTAL GENERAL' ||
-    firstNonEmpty === 'TOTALES' ||
-    firstNonEmpty === 'SUMA' ||
-    firstNonEmpty.startsWith('TOTAL ')
-  ) {
-    return false;
-  }
-
-  return true;
+  return isRowValidData(cells);
 }
 
 export function parseGridToFlota(rawRows: (string | unknown)[][]): FlotaItem[] {

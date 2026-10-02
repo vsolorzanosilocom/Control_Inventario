@@ -1,21 +1,6 @@
 import Papa from 'papaparse';
 import { RouterItem } from '../types';
-
-export function normalizeText(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  return String(value)
-    .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-export function normalizeDimension(value: unknown, fallback: string): string {
-  const clean = normalizeText(value);
-  if (!clean || clean === '-' || clean === 'N/A' || clean === 'S/N' || clean === 'SIN INFORMACION' || clean === 'NONE') {
-    return fallback;
-  }
-  return clean.toUpperCase();
-}
+import { normalizeText, normalizeDimension, isRowValidData, findColumnIndex } from './csvUtils';
 
 interface RouterColumnIndices {
   idxSerial: number;
@@ -43,60 +28,32 @@ interface RouterColumnIndices {
 function findRouterColumnIndices(headers: string[]): RouterColumnIndices {
   const normHeaders = headers.map(h => normalizeText(h).toUpperCase());
 
-  const findIdx = (keywords: string[], defaultIdx: number): number => {
-    // Exact match first
-    for (const kw of keywords) {
-      const idx = normHeaders.indexOf(kw);
-      if (idx !== -1) return idx;
-    }
-    // Partial substring match
-    for (const kw of keywords) {
-      const idx = normHeaders.findIndex(h => h.includes(kw));
-      if (idx !== -1) return idx;
-    }
-    return defaultIdx;
-  };
-
   return {
-    idxSerial: findIdx(['SERIAL', 'SERIAL ROUTER', 'SERIE', 'S/N'], 0),
-    idxImei: findIdx(['IMEI', 'IMEI ROUTER'], 1),
-    idxMarca: findIdx(['MARCA', 'FABRICANTE', 'BRAND'], 2),
-    idxModelo: findIdx(['MODELO', 'MODEL'], 3),
-    idxFechaEntrada: findIdx(['FECHA DE ENTRADA', 'FECHA ENTRADA', 'F. ENTRADA', 'ENTRADA', 'INGRESO'], 4),
-    idxObservacion: findIdx(['OBSERVACION', 'OBSERVACIONES', 'NOTA', 'NOTAS', 'OBS'], 5),
-    idxCodCliente: findIdx(['COD CLIENTE', 'COD_CLIENTE', 'CODIGO CLIENTE', 'RIF CLIENTE', 'RIF'], 6),
-    idxComercio: findIdx(['COMERCIO', 'NOMBRE COMERCIO', 'CLIENTE', 'ESTABLECIMIENTO'], 7),
-    idxSimAsignada: findIdx(['SIM ASIGNADA', 'SIM', 'LINEA', 'NUMERO SIM', 'SIMCARD'], 8),
-    idxAlmacen: findIdx(['ALMACEN', 'ALMACÉN', 'UBICACION', 'DEPOSITO', 'CUSTODIA'], 9),
-    idxTecnico: findIdx(['TECNICO', 'TÉCNICO', 'TECNICOS', 'RESPONSABLE'], 10),
-    idxFechaSalida: findIdx(['FECHA DE SALIDA', 'FECHA SALIDA', 'F. SALIDA', 'SALIDA', 'EGRESO'], 11),
-    idxPermanencia: findIdx(['PERMANENCIA', 'TIEMPO'], 12),
-    idxStatus: findIdx(['STATUS', 'ESTATUS', 'ESTADO', 'STATUS 1'], 13),
-    idxStatusPago: findIdx(['STATUS DE PAGO', 'STATUS PAGO', 'ESTATUS PAGO', 'PAGO'], 14),
-    idxProcesador: findIdx(['PROCESADOR'], 15),
-    idxFechaInstalacion: findIdx(['FECHA DE INSTALACION', 'FECHA INSTALACION', 'F. INSTALACION', 'INSTALACION'], 16),
-    idxCodigo: findIdx(['CODIGO', 'CÓDIGO', 'COD'], 17),
-    idxCondicion: findIdx(['CONDICION', 'CONDICIÓN', 'CONDICION FISICA', 'ESTADO FISICO'], 18),
-    idxStatus2: findIdx(['STATUS 2', 'STATUS2', 'ESTATUS 2', 'ESTADO 2', 'ACTIVO/INACTIVO'], 19),
+    idxSerial: findColumnIndex(['SERIAL', 'SERIAL ROUTER', 'SERIE', 'S/N'], 0, normHeaders),
+    idxImei: findColumnIndex(['IMEI', 'IMEI ROUTER'], 1, normHeaders),
+    idxMarca: findColumnIndex(['MARCA', 'FABRICANTE', 'BRAND'], 2, normHeaders),
+    idxModelo: findColumnIndex(['MODELO', 'MODEL'], 3, normHeaders),
+    idxFechaEntrada: findColumnIndex(['FECHA DE ENTRADA', 'FECHA ENTRADA', 'F. ENTRADA', 'ENTRADA', 'INGRESO'], 4, normHeaders),
+    idxObservacion: findColumnIndex(['OBSERVACION', 'OBSERVACIONES', 'NOTA', 'NOTAS', 'OBS'], 5, normHeaders),
+    idxCodCliente: findColumnIndex(['COD CLIENTE', 'COD_CLIENTE', 'CODIGO CLIENTE', 'RIF CLIENTE', 'RIF'], 6, normHeaders),
+    idxComercio: findColumnIndex(['COMERCIO', 'NOMBRE COMERCIO', 'CLIENTE', 'ESTABLECIMIENTO'], 7, normHeaders),
+    idxSimAsignada: findColumnIndex(['SIM ASIGNADA', 'SIM', 'LINEA', 'NUMERO SIM', 'SIMCARD'], 8, normHeaders),
+    idxAlmacen: findColumnIndex(['ALMACEN', 'ALMACÉN', 'UBICACION', 'DEPOSITO', 'CUSTODIA'], 9, normHeaders),
+    idxTecnico: findColumnIndex(['TECNICO', 'TÉCNICO', 'TECNICOS', 'RESPONSABLE'], 10, normHeaders),
+    idxFechaSalida: findColumnIndex(['FECHA DE SALIDA', 'FECHA SALIDA', 'F. SALIDA', 'SALIDA', 'EGRESO'], 11, normHeaders),
+    idxPermanencia: findColumnIndex(['PERMANENCIA', 'TIEMPO'], 12, normHeaders),
+    idxStatus: findColumnIndex(['STATUS', 'ESTATUS', 'ESTADO', 'STATUS 1'], 13, normHeaders),
+    idxStatusPago: findColumnIndex(['STATUS DE PAGO', 'STATUS PAGO', 'ESTATUS PAGO', 'PAGO'], 14, normHeaders),
+    idxProcesador: findColumnIndex(['PROCESADOR'], 15, normHeaders),
+    idxFechaInstalacion: findColumnIndex(['FECHA DE INSTALACION', 'FECHA INSTALACION', 'F. INSTALACION', 'INSTALACION'], 16, normHeaders),
+    idxCodigo: findColumnIndex(['CODIGO', 'CÓDIGO', 'COD'], 17, normHeaders),
+    idxCondicion: findColumnIndex(['CONDICION', 'CONDICIÓN', 'CONDICION FISICA', 'ESTADO FISICO'], 18, normHeaders),
+    idxStatus2: findColumnIndex(['STATUS 2', 'STATUS2', 'ESTATUS 2', 'ESTADO 2', 'ACTIVO/INACTIVO'], 19, normHeaders),
   };
 }
 
 function isRouterRowValid(cells: string[]): boolean {
-  const nonEmptyCells = cells.filter(c => normalizeText(c).length > 0);
-  if (nonEmptyCells.length === 0) return false;
-
-  const firstNonEmpty = normalizeText(nonEmptyCells[0]).toUpperCase();
-  if (
-    firstNonEmpty === 'TOTAL' ||
-    firstNonEmpty === 'TOTAL GENERAL' ||
-    firstNonEmpty === 'TOTALES' ||
-    firstNonEmpty === 'SUMA' ||
-    firstNonEmpty.startsWith('TOTAL ')
-  ) {
-    return false;
-  }
-
-  return true;
+  return isRowValidData(cells);
 }
 
 export function parseGridToRouters(rawRows: (string | unknown)[][]): RouterItem[] {

@@ -1,21 +1,6 @@
 import Papa from 'papaparse';
 import { SensorizeitItem } from '../types';
-
-export function normalizeText(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  return String(value)
-    .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-export function normalizeDimension(value: unknown, fallback: string): string {
-  const clean = normalizeText(value);
-  if (!clean || clean === '-' || clean === 'N/A' || clean === 'S/N' || clean === 'SIN INFORMACION' || clean === 'NONE') {
-    return fallback;
-  }
-  return clean.toUpperCase();
-}
+import { normalizeText, normalizeDimension, isRowValidData, findColumnIndex } from './csvUtils';
 
 interface SensorizeitColumnIndices {
   idxSerial: number;
@@ -45,60 +30,34 @@ interface SensorizeitColumnIndices {
 function findSensorizeitColumnIndices(headers: string[]): SensorizeitColumnIndices {
   const normHeaders = headers.map(h => normalizeText(h).toUpperCase());
 
-  const findIdx = (keywords: string[], defaultIdx: number): number => {
-    for (const kw of keywords) {
-      const idx = normHeaders.indexOf(kw);
-      if (idx !== -1) return idx;
-    }
-    for (const kw of keywords) {
-      const idx = normHeaders.findIndex(h => h.includes(kw));
-      if (idx !== -1) return idx;
-    }
-    return defaultIdx;
-  };
-
   return {
-    idxSerial: findIdx(['SERIAL', 'SERIE', 'S/N'], 0),
-    idxImei: findIdx(['IMEI'], 1),
-    idxDevEui: findIdx(['DEV EUI', 'DEVEUI', 'DEV_EUI'], 2),
-    idxAppEui: findIdx(['APP EUI', 'APPEUI', 'APP_EUI', 'JOIN EUI', 'JOINEUI'], 3),
-    idxAppKey: findIdx(['APP KEY', 'APPKEY', 'APP_KEY'], 4),
-    idxAppsKey: findIdx(['APPSKEY', 'APPS KEY', 'APPS_KEY', 'APP SKEY'], 5),
-    idxNetsKey: findIdx(['NETSKEY', 'NETS KEY', 'NETS_KEY', 'NWKSKEY', 'NWK SKEY'], 6),
-    idxAtPin: findIdx(['AT PIN', 'ATPIN', 'AT_PIN'], 7),
-    idxOtaPin: findIdx(['OTA PIN', 'OTAPIN', 'OTA_PIN'], 8),
-    idxTipoSensor: findIdx(['TIPO DE SENSOR', 'TIPO SENSOR', 'TIPO DE DISPOSITIVO', 'TIPO', 'SENSOR'], 9),
-    idxMarca: findIdx(['MARCA', 'FABRICANTE', 'BRAND'], 10),
-    idxModelo: findIdx(['MODELO', 'MODEL'], 11),
-    idxFechaEntrada: findIdx(['FECHA DE ENTRADA', 'FECHA ENTRADA', 'F. ENTRADA', 'ENTRADA', 'INGRESO'], 12),
-    idxObservacion: findIdx(['OBSERVACION', 'OBSERVACIONES', 'NOTA', 'NOTAS', 'OBS'], 13),
-    idxRifCliente: findIdx(['RIF CLIENTE', 'RIF', 'COD CLIENTE', 'COD_CLIENTE'], 14),
-    idxComercio: findIdx(['COMERCIO', 'NOMBRE COMERCIO', 'CLIENTE', 'ESTABLECIMIENTO'], 15),
-    idxSimAsignada: findIdx(['SIM ASIGNADA', 'SIM', 'LINEA', 'NUMERO SIM'], 16),
-    idxAlmacen: findIdx(['ALMACEN', 'ALMACÉN', 'UBICACION', 'DEPOSITO', 'CUSTODIA'], 17),
-    idxTecnico: findIdx(['TECNICO', 'TÉCNICO', 'TECNICOS', 'RESPONSABLE'], 18),
-    idxFechaSalida: findIdx(['FECHA DE SALIDA', 'FECHA SALIDA', 'F. SALIDA', 'SALIDA', 'EGRESO'], 19),
-    idxStatus: findIdx(['STATUS', 'ESTATUS', 'ESTADO', 'ESTADO OPERATIVO'], 20),
-    idxFechaInstalacion: findIdx(['FECHA DE INSTALACION', 'FECHA INSTALACION', 'F. INSTALACION', 'INSTALACION'], 21),
+    idxSerial: findColumnIndex(['SERIAL', 'SERIE', 'S/N'], 0, normHeaders),
+    idxImei: findColumnIndex(['IMEI'], 1, normHeaders),
+    idxDevEui: findColumnIndex(['DEV EUI', 'DEVEUI', 'DEV_EUI'], 2, normHeaders),
+    idxAppEui: findColumnIndex(['APP EUI', 'APPEUI', 'APP_EUI', 'JOIN EUI', 'JOINEUI'], 3, normHeaders),
+    idxAppKey: findColumnIndex(['APP KEY', 'APPKEY', 'APP_KEY'], 4, normHeaders),
+    idxAppsKey: findColumnIndex(['APPSKEY', 'APPS KEY', 'APPS_KEY', 'APP SKEY'], 5, normHeaders),
+    idxNetsKey: findColumnIndex(['NETSKEY', 'NETS KEY', 'NETS_KEY', 'NWKSKEY', 'NWK SKEY'], 6, normHeaders),
+    idxAtPin: findColumnIndex(['AT PIN', 'ATPIN', 'AT_PIN'], 7, normHeaders),
+    idxOtaPin: findColumnIndex(['OTA PIN', 'OTAPIN', 'OTA_PIN'], 8, normHeaders),
+    idxTipoSensor: findColumnIndex(['TIPO DE SENSOR', 'TIPO SENSOR', 'TIPO DE DISPOSITIVO', 'TIPO', 'SENSOR'], 9, normHeaders),
+    idxMarca: findColumnIndex(['MARCA', 'FABRICANTE', 'BRAND'], 10, normHeaders),
+    idxModelo: findColumnIndex(['MODELO', 'MODEL'], 11, normHeaders),
+    idxFechaEntrada: findColumnIndex(['FECHA DE ENTRADA', 'FECHA ENTRADA', 'F. ENTRADA', 'ENTRADA', 'INGRESO'], 12, normHeaders),
+    idxObservacion: findColumnIndex(['OBSERVACION', 'OBSERVACIONES', 'NOTA', 'NOTAS', 'OBS'], 13, normHeaders),
+    idxRifCliente: findColumnIndex(['RIF CLIENTE', 'RIF', 'COD CLIENTE', 'COD_CLIENTE'], 14, normHeaders),
+    idxComercio: findColumnIndex(['COMERCIO', 'NOMBRE COMERCIO', 'CLIENTE', 'ESTABLECIMIENTO'], 15, normHeaders),
+    idxSimAsignada: findColumnIndex(['SIM ASIGNADA', 'SIM', 'LINEA', 'NUMERO SIM'], 16, normHeaders),
+    idxAlmacen: findColumnIndex(['ALMACEN', 'ALMACÉN', 'UBICACION', 'DEPOSITO', 'CUSTODIA'], 17, normHeaders),
+    idxTecnico: findColumnIndex(['TECNICO', 'TÉCNICO', 'TECNICOS', 'RESPONSABLE'], 18, normHeaders),
+    idxFechaSalida: findColumnIndex(['FECHA DE SALIDA', 'FECHA SALIDA', 'F. SALIDA', 'SALIDA', 'EGRESO'], 19, normHeaders),
+    idxStatus: findColumnIndex(['STATUS', 'ESTATUS', 'ESTADO', 'ESTADO OPERATIVO'], 20, normHeaders),
+    idxFechaInstalacion: findColumnIndex(['FECHA DE INSTALACION', 'FECHA INSTALACION', 'F. INSTALACION', 'INSTALACION'], 21, normHeaders),
   };
 }
 
 function isSensorizeitRowValid(cells: string[]): boolean {
-  const nonEmptyCells = cells.filter(c => normalizeText(c).length > 0);
-  if (nonEmptyCells.length === 0) return false;
-
-  const firstNonEmpty = normalizeText(nonEmptyCells[0]).toUpperCase();
-  if (
-    firstNonEmpty === 'TOTAL' ||
-    firstNonEmpty === 'TOTAL GENERAL' ||
-    firstNonEmpty === 'TOTALES' ||
-    firstNonEmpty === 'SUMA' ||
-    firstNonEmpty.startsWith('TOTAL ')
-  ) {
-    return false;
-  }
-
-  return true;
+  return isRowValidData(cells);
 }
 
 export function parseGridToSensorizeit(rawRows: (string | unknown)[][]): SensorizeitItem[] {

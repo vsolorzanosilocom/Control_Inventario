@@ -1,50 +1,6 @@
 import Papa from 'papaparse';
-import { RawSimRecord, SimCardItem } from '../types';
-
-/**
- * Strips invisible unicode characters, converts non-breaking spaces to standard spaces,
- * collapses multiple consecutive spaces into a single space, and trims outer whitespace.
- */
-export function normalizeText(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  return String(value)
-    .replace(/[\u200B-\u200D\uFEFF\u00A0]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-/**
- * Standardizes categorization dimension values (removes whitespace, normalizes casing).
- */
-export function normalizeDimension(value: unknown, fallback: string): string {
-  const clean = normalizeText(value);
-  if (!clean || clean === '-' || clean === 'N/A' || clean === 'S/N' || clean === 'SIN INFORMACION') {
-    return fallback;
-  }
-  return clean.toUpperCase();
-}
-
-/**
- * Detects if a row is purely an empty line, empty array, or total summary row.
- */
-function isRowValidData(cells: string[]): boolean {
-  const nonEmptyCells = cells.filter(c => normalizeText(c).length > 0);
-  if (nonEmptyCells.length === 0) return false;
-
-  // Check if it's a summary/total row from the spreadsheet
-  const firstNonEmpty = normalizeText(nonEmptyCells[0]).toUpperCase();
-  if (
-    firstNonEmpty === 'TOTAL' ||
-    firstNonEmpty === 'TOTAL GENERAL' ||
-    firstNonEmpty === 'TOTALES' ||
-    firstNonEmpty === 'SUMA' ||
-    firstNonEmpty.startsWith('TOTAL ')
-  ) {
-    return false;
-  }
-
-  return true;
-}
+import { SimCardItem } from '../types';
+import { normalizeText, normalizeDimension, isRowValidData, findColumnIndex } from './csvUtils';
 
 /**
  * Flexible header locator for column variations in the "SIM" sheet.
@@ -76,42 +32,28 @@ interface ColumnIndices {
 function findColumnIndices(headers: string[]): ColumnIndices {
   const normHeaders = headers.map(h => normalizeText(h).toUpperCase());
 
-  const findIdx = (keywords: string[], defaultIdx: number): number => {
-    // Exact match first
-    for (const kw of keywords) {
-      const idx = normHeaders.indexOf(kw);
-      if (idx !== -1) return idx;
-    }
-    // Partial substring match
-    for (const kw of keywords) {
-      const idx = normHeaders.findIndex(h => h.includes(kw));
-      if (idx !== -1) return idx;
-    }
-    return defaultIdx;
-  };
-
   return {
-    idxA: findIdx(['SERIAL SIMCARD', 'SERIAL SIM', 'ICCID', 'SERIAL', 'SIMCARD'], 0),
-    idxB: findIdx(['NUMERO TELEFONICO', 'NUMERO', 'TELEFONO', 'MSISDN', 'LINEA'], 1),
-    idxC: findIdx(['DIRECCION IP', 'DIRECCION_IP', 'IP'], 2),
-    idxD: findIdx(['CODIGO PUK', 'PUK', 'COD_PUK'], 3),
-    idxE: findIdx(['OPERADORA', 'OPERADOR'], 4),
-    idxF: findIdx(['PROPIETARIO', 'DUENO', 'OWNER'], 5),
-    idxG: findIdx(['PROCESADOR'], 6),
-    idxH: findIdx(['FECHA DE ENTRADA', 'FECHA ENTRADA', 'F. ENTRADA', 'F_ENTRADA', 'INGRESO'], 7),
-    idxI: findIdx(['OBSERVACION', 'OBSERVACIONES', 'NOTA', 'NOTAS'], 8),
-    idxJ: findIdx(['COD CLIENTE', 'COD_CLIENTE', 'CODIGO CLIENTE', 'CODIGO_CLIENTE', 'RIF'], 9),
-    idxK: findIdx(['COMERCIO', 'NOMBRE COMERCIO', 'ESTABLECIMIENTO', 'CLIENTE'], 10),
-    idxL: findIdx(['EQUIPO ASIGNADO', 'EQUIPO', 'TERMINAL', 'POS', 'SERIAL EQUIPO'], 11),
-    idxM: findIdx(['ALMACEN', 'UBICACION', 'DEPOSITO'], 12),
-    idxN: findIdx(['TECNICOS', 'TECNICO', 'RESPONSABLE'], 13),
-    idxO: findIdx(['STATUS', 'ESTATUS', 'ESTADO', 'ESTADO OPERATIVO'], 14),
-    idxP: findIdx(['SS', 'S/S', 'SERIAL SIM'], 15),
-    idxQ: findIdx(['FECHA SALIDA', 'FECHA DE SALIDA', 'F. SALIDA', 'F_SALIDA', 'EGRESO'], 16),
-    idxR: findIdx(['PERMANENCIA', 'TIEMPO'], 17),
-    idxS: findIdx(['CARRIER', 'TIPO'], 18),
-    idxT: findIdx(['ACTIVO/INACTIVO', 'ACTIVO_INACTIVO', 'ACTIVO / INACTIVO', 'ACTIVO'], 19),
-    idxU: findIdx(['SIM STATUS', 'SIM_STATUS', 'ESTATUS SIM', 'STATUS SIM'], 20),
+    idxA: findColumnIndex(['SERIAL SIMCARD', 'SERIAL SIM', 'ICCID', 'SERIAL', 'SIMCARD'], 0, normHeaders),
+    idxB: findColumnIndex(['NUMERO TELEFONICO', 'NUMERO', 'TELEFONO', 'MSISDN', 'LINEA'], 1, normHeaders),
+    idxC: findColumnIndex(['DIRECCION IP', 'DIRECCION_IP', 'IP'], 2, normHeaders),
+    idxD: findColumnIndex(['CODIGO PUK', 'PUK', 'COD_PUK'], 3, normHeaders),
+    idxE: findColumnIndex(['OPERADORA', 'OPERADOR'], 4, normHeaders),
+    idxF: findColumnIndex(['PROPIETARIO', 'DUENO', 'OWNER'], 5, normHeaders),
+    idxG: findColumnIndex(['PROCESADOR'], 6, normHeaders),
+    idxH: findColumnIndex(['FECHA DE ENTRADA', 'FECHA ENTRADA', 'F. ENTRADA', 'F_ENTRADA', 'INGRESO'], 7, normHeaders),
+    idxI: findColumnIndex(['OBSERVACION', 'OBSERVACIONES', 'NOTA', 'NOTAS'], 8, normHeaders),
+    idxJ: findColumnIndex(['COD CLIENTE', 'COD_CLIENTE', 'CODIGO CLIENTE', 'CODIGO_CLIENTE', 'RIF'], 9, normHeaders),
+    idxK: findColumnIndex(['COMERCIO', 'NOMBRE COMERCIO', 'ESTABLECIMIENTO', 'CLIENTE'], 10, normHeaders),
+    idxL: findColumnIndex(['EQUIPO ASIGNADO', 'EQUIPO', 'TERMINAL', 'POS', 'SERIAL EQUIPO'], 11, normHeaders),
+    idxM: findColumnIndex(['ALMACEN', 'UBICACION', 'DEPOSITO'], 12, normHeaders),
+    idxN: findColumnIndex(['TECNICOS', 'TECNICO', 'RESPONSABLE'], 13, normHeaders),
+    idxO: findColumnIndex(['STATUS', 'ESTATUS', 'ESTADO', 'ESTADO OPERATIVO'], 14, normHeaders),
+    idxP: findColumnIndex(['SS', 'S/S', 'SERIAL SIM'], 15, normHeaders),
+    idxQ: findColumnIndex(['FECHA SALIDA', 'FECHA DE SALIDA', 'F. SALIDA', 'F_SALIDA', 'EGRESO'], 16, normHeaders),
+    idxR: findColumnIndex(['PERMANENCIA', 'TIEMPO'], 17, normHeaders),
+    idxS: findColumnIndex(['CARRIER', 'TIPO'], 18, normHeaders),
+    idxT: findColumnIndex(['ACTIVO/INACTIVO', 'ACTIVO_INACTIVO', 'ACTIVO / INACTIVO', 'ACTIVO'], 19, normHeaders),
+    idxU: findColumnIndex(['SIM STATUS', 'SIM_STATUS', 'ESTATUS SIM', 'STATUS SIM'], 20, normHeaders),
   };
 }
 

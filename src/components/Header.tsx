@@ -1,6 +1,7 @@
 import React from 'react';
 import { RefreshCw, Database, CheckCircle2, AlertCircle, Settings, FileSpreadsheet, Radio, Cpu, Truck, Activity } from 'lucide-react';
 import { InventoryTab, SheetSlotConfig } from '../types';
+import { SilocomLogo } from './SilocomLogo';
 
 interface HeaderProps {
   activeTab: InventoryTab;
@@ -42,18 +43,7 @@ export const Header: React.FC<HeaderProps> = ({
           
           {/* Logo & Corporate Brand */}
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3 bg-white px-3.5 py-1.5 rounded-lg shadow-inner">
-              <div className="flex flex-col items-center">
-                <div className="flex items-center tracking-tight font-black text-2xl leading-none">
-                  <span className="text-slate-900 font-extrabold">S</span>
-                  <span className="text-rose-700 font-black px-0.5 inline-block text-2xl">I</span>
-                  <span className="text-slate-900 font-extrabold">locom</span>
-                </div>
-                <span className="text-[9px] font-bold text-slate-800 tracking-wider mt-0.5">
-                  RIF: J-30725192-1
-                </span>
-              </div>
-            </div>
+            <SilocomLogo size="md" showRif={true} variant="badge" />
 
             <div className="border-l border-slate-700 pl-3">
               <div className="flex items-center gap-2">
